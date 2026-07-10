@@ -25,16 +25,34 @@ Para ejecutar el despliegue, abre una terminal en la raíz del proyecto y corre:
 
 Una vez que el script finaliza, la API estará escuchando peticiones en el puerto `3000`. Gracias a la arquitectura implementada, las peticiones **POST** enrutan automáticamente al `maestro` y las peticiones **GET** se balancean entre las réplicas.
 
-Puedes probarlo desde otra pestaña de tu terminal:
+### Opción A: Pruebas con Postman (Recomendado)
 
-**Para insertar un dato (Escritura -> viaja al Maestro):**
+**1. Para insertar un dato (Escritura -> viaja al Maestro):**
+- **Método:** `POST`
+- **URL:** `http://localhost:3000/api/items`
+- **Body:** Selecciona `raw` y cambia a `JSON`. Pega lo siguiente:
+  ```json
+  {
+      "name": "Probando desde Postman"
+  }
+  ```
+- **Send:** Debería devolver `201 Created`.
+
+**2. Para consultar los datos (Lectura -> se lee de la_nueva o la_ex):**
+- **Método:** `GET`
+- **URL:** `http://localhost:3000/api/items`
+- **Send:** Debería devolver `200 OK` con todos los registros actuales.
+
+### Opción B: Pruebas rápidas por Terminal (cURL)
+
+**Para insertar un dato:**
 ```bash
 curl -X POST http://localhost:3000/api/items \
      -H "Content-Type: application/json" \
      -d '{"name": "Dato de Prueba 1"}'
 ```
 
-**Para consultar los datos (Lectura -> se lee desde la_nueva o la_ex):**
+**Para consultar los datos:**
 ```bash
 curl http://localhost:3000/api/items
 ```
