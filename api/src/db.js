@@ -10,7 +10,7 @@ const cluster = mysql.createPoolCluster({
 
 // Nodo Maestro (Escrituras)
 cluster.add('MASTER', {
-  host: 'mdb-master', // Nombre del contenedor docker
+  host: 'maestro', // Nombre del contenedor docker
   user: 'root',
   password: 'rootpassword',
   database: 'lab_test',
@@ -19,7 +19,7 @@ cluster.add('MASTER', {
 
 // Nodo Réplica 1 (Lecturas)
 cluster.add('REPLICA1', {
-  host: 'mdb-replica1',
+  host: 'la_nueva',
   user: 'root',
   password: 'rootpassword',
   database: 'lab_test',
@@ -28,7 +28,7 @@ cluster.add('REPLICA1', {
 
 // Nodo Réplica 2 (Lecturas)
 cluster.add('REPLICA2', {
-  host: 'mdb-replica2',
+  host: 'la_ex',
   user: 'root',
   password: 'rootpassword',
   database: 'lab_test',

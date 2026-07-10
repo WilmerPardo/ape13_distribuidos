@@ -1,9 +1,9 @@
 version: '3.8'
 
 services:
-  mdb-master:
+  maestro:
     image: mariadb:10.11
-    container_name: mdb-master
+    container_name: maestro
     environment:
       MARIADB_ROOT_PASSWORD: rootpassword
       MARIADB_DATABASE: lab_db
@@ -14,9 +14,9 @@ services:
     networks:
       - db_network
 
-  mdb-replica1:
+  la_nueva:
     image: mariadb:10.11
-    container_name: mdb-replica1
+    container_name: la_nueva
     environment:
       MARIADB_ROOT_PASSWORD: rootpassword
     ports:
@@ -26,11 +26,11 @@ services:
     networks:
       - db_network
     depends_on:
-      - mdb-master
+      - maestro
 
-  mdb-replica2:
+  la_ex:
     image: mariadb:10.11
-    container_name: mdb-replica2
+    container_name: la_ex
     environment:
       MARIADB_ROOT_PASSWORD: rootpassword
     ports:
@@ -40,7 +40,7 @@ services:
     networks:
       - db_network
     depends_on:
-      - mdb-master
+      - maestro
 
   api:
     image: node:18-alpine
@@ -55,9 +55,9 @@ services:
     networks:
       - db_network
     depends_on:
-      - mdb-master
-      - mdb-replica1
-      - mdb-replica2
+      - maestro
+      - la_nueva
+      - la_ex
 
 networks:
   db_network:
