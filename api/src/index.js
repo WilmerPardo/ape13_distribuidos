@@ -1,11 +1,11 @@
 const express = require('express');
-const routes = require('./routes');
+const itemRoutes = require('./routes/itemRoutes');
 
 const app = express();
 app.use(express.json());
 
 // Montar las rutas
-app.use('/api', routes);
+app.use('/api', itemRoutes);
 
 // Ruta de healthcheck
 app.get('/health', (req, res) => {
