@@ -1,78 +1,66 @@
 # Guía de Ejecución: Clúster MariaDB (Replicación y Failover)
 
-Esta guía detalla los comandos exactos para ejecutar la práctica de despliegue de un clúster MariaDB con replicación lógica (Binlog) y probar su tolerancia a fallos, basada en la estructura del directorio `lab_replica`.
+Esta guía detalla los pasos para ejecutar la práctica de despliegue de un clúster MariaDB con replicación lógica (Binlog), junto con una API REST en Node.js que implementa una arquitectura por capas y el patrón **CQRS**. Todo el despliegue, configuración y pruebas han sido automatizados mediante scripts para facilitar su ejecución.
 
-## Fase 2: Despliegue del Clúster MariaDB y Replicación
+---
 
-### 1. Iniciar los contenedores
-Asegúrate de estar dentro del directorio `lab_replica` donde se encuentra el archivo `docker-compose.yml`.
+## 1. Despliegue Automatizado
+
+El script de despliegue se encarga automáticamente de:
+1. Limpiar y eliminar cualquier entorno previo.
+2. Levantar el clúster con Docker Compose (`maestro`, `la_nueva`, `la_ex` y la `API REST`).
+3. Crear el usuario de replicación, extraer las posiciones de los *logs* y vincular las réplicas al maestro.
+4. Crear la base de datos de prueba.
+
+Para ejecutar el despliegue, abre una terminal en la raíz del proyecto y corre:
+
+```bash
+./scripts/deploy.sh
+```
+> *Nota: El script hará pausas automáticas para permitir que las bases de datos de MariaDB se inicialicen internamente de forma correcta.*
+
+---
+
+## 2. Pruebas a la API REST (CQRS)
+
+Una vez que el script finaliza, la API estará escuchando peticiones en el puerto `3000`. Gracias a la arquitectura implementada, las peticiones **POST** enrutan automáticamente al `maestro` y las peticiones **GET** se balancean entre las réplicas.
+
+Puedes probarlo desde otra pestaña de tu terminal:
+
+**Para insertar un dato (Escritura -> viaja al Maestro):**
+```bash
+curl -X POST http://localhost:3000/api/items \
+     -H "Content-Type: application/json" \
+     -d '{"name": "Dato de Prueba 1"}'
+```
+
+**Para consultar los datos (Lectura -> se lee desde la_nueva o la_ex):**
+```bash
+curl http://localhost:3000/api/items
+```
+
+---
+
+## 3. Prueba de Tolerancia a Fallos (Failover Automatizado)
+
+Para comprobar la resiliencia del clúster frente a caídas, hemos creado un segundo script que realiza la simulación de un escenario de desastre y recuperación:
+1. Simula una caída deteniendo el contenedor del maestro (`maestro`).
+2. Entra a la Réplica 1 (`la_nueva`), borra la metadata de esclavo y deshabilita su modo de *solo lectura* para promoverlo.
+3. Inserta exitosamente un nuevo registro confirmando que ahora ejerce como Maestro.
+
+Para ejecutar la prueba de failover, simplemente corre:
+
+```bash
+./scripts/test_failover.sh
+```
+
+---
+
+## 4. Parada y Limpieza del Sistema
+
+Si deseas detener los contenedores y destruir por completo la información, los logs y las tablas, debes borrar los volúmenes de Docker ubicándote en la carpeta `lab_replica`:
+
 ```bash
 cd lab_replica
-docker-compose up -d
-```
-> *Nota: Espera unos 10-15 segundos antes de continuar para permitir que el motor de MariaDB se inicialice correctamente.*
-
-### 2. Configurar el Maestro
-Crea el usuario de replicación y verifica la posición actual del log binario en el Maestro.
-```bash
-docker exec mdb-master mariadb -uroot -prootpassword -e "GRANT REPLICATION SLAVE ON *.* TO 'replica_user'@'%' IDENTIFIED BY 'replica_password'; FLUSH PRIVILEGES; SHOW MASTER STATUS;"
-```
-Anota los valores que aparezcan bajo las columnas **File** (ej. `mysql-bin.000002`) y **Position** (ej. `669`).
-
-### 3. Configurar las Réplicas
-Utiliza los valores de File y Position obtenidos en el paso anterior y reemplázalos en los siguientes comandos.
-
-**Para la Réplica 1:**
-```bash
-docker exec mdb-replica1 mariadb -uroot -prootpassword -e "CHANGE MASTER TO MASTER_HOST='mdb-master', MASTER_USER='replica_user', MASTER_PASSWORD='replica_password', MASTER_LOG_FILE='mysql-bin.000002', MASTER_LOG_POS=669; START SLAVE; SHOW SLAVE STATUS\G"
-```
-
-**Para la Réplica 2:**
-```bash
-docker exec mdb-replica2 mariadb -uroot -prootpassword -e "CHANGE MASTER TO MASTER_HOST='mdb-master', MASTER_USER='replica_user', MASTER_PASSWORD='replica_password', MASTER_LOG_FILE='mysql-bin.000002', MASTER_LOG_POS=669; START SLAVE; SHOW SLAVE STATUS\G"
-```
-> *Asegúrate de que en la salida de ambos comandos aparezcan las líneas: `Slave_IO_Running: Yes` y `Slave_SQL_Running: Yes`.*
-
-### 4. Validar Consistencia Eventual
-Genera datos en el maestro:
-```bash
-docker exec mdb-master mariadb -uroot -prootpassword -e "CREATE DATABASE lab_test; USE lab_test; CREATE TABLE items (id INT, name VARCHAR(50)); INSERT INTO items VALUES (1, 'Dato Maestro');"
-```
-
-Verifica que el dato existe en las réplicas:
-```bash
-docker exec mdb-replica1 mariadb -uroot -prootpassword -e "USE lab_test; SELECT * FROM items;"
-docker exec mdb-replica2 mariadb -uroot -prootpassword -e "USE lab_test; SELECT * FROM items;"
-```
-
----
-
-## Fase 3: Tolerancia a Fallos (Failover)
-
-### 1. Detener el Maestro original
-Simularemos que el servidor maestro ha sufrido una caída:
-```bash
-docker stop mdb-master
-```
-
-### 2. Promover la Réplica 1 a Maestro
-Detenemos el proceso esclavo, limpiamos la metadata de replicación y desactivamos el modo de solo lectura para habilitar escrituras:
-```bash
-docker exec mdb-replica1 mariadb -uroot -prootpassword -e "STOP SLAVE; RESET SLAVE ALL; SET GLOBAL read_only = 0;"
-```
-
-### 3. Validar nuevo Maestro (Escritura en Réplica 1)
-Insertamos un nuevo registro para comprobar que ahora la Réplica 1 acepta operaciones de escritura:
-```bash
-docker exec mdb-replica1 mariadb -uroot -prootpassword -e "USE lab_test; INSERT INTO items VALUES (2, 'Dato Failover en Replica 1'); SELECT * FROM items;"
-```
-
----
-
-## Parada y Limpieza del Sistema
-
-Una vez finalizadas las pruebas, puedes apagar los contenedores y eliminar todo (redes y volúmenes generados) para dejar el entorno limpio:
-```bash
-# Estando dentro de lab_replica
 docker-compose down -v
 ```
