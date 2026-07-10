@@ -42,6 +42,23 @@ services:
     depends_on:
       - mdb-master
 
+  api:
+    image: node:18-alpine
+    container_name: api-replicas
+    working_dir: /app
+    volumes:
+      - ../api:/app
+    command: >
+      sh -c "npm install && npm start"
+    ports:
+      - "3000:3000"
+    networks:
+      - db_network
+    depends_on:
+      - mdb-master
+      - mdb-replica1
+      - mdb-replica2
+
 networks:
   db_network:
     driver: bridge
