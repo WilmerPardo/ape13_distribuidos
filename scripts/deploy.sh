@@ -2,7 +2,7 @@
 set -e
 
 echo "=== Desplegando Contenedores ==="
-cd ../lab_replica
+cd "$(dirname "$0")/../lab_replica"
 docker-compose down -v
 docker-compose up -d
 
