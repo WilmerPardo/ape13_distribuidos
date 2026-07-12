@@ -1,9 +1,3 @@
-# Guía de Ejecución: Clúster MariaDB (Replicación y Failover)
-
-Esta guía detalla los pasos para ejecutar la práctica de despliegue de un clúster MariaDB con replicación lógica (Binlog), junto con una API REST en Node.js que implementa una arquitectura por capas y el patrón **CQRS**. Todo el despliegue, configuración y pruebas han sido automatizados mediante scripts para facilitar su ejecución.
-
----
-
 ## 1. Despliegue Automatizado
 
 El script de despliegue se encarga automáticamente de:
@@ -59,22 +53,67 @@ curl http://localhost:3000/api/items
 
 ---
 
-## 3. Prueba de Tolerancia a Fallos (Failover Automatizado)
+## 3. Pruebas de Consistencia y Restricciones de Replicación
 
-Para comprobar la resiliencia del clúster frente a caídas, hemos creado un segundo script que realiza la simulación de un escenario de desastre y recuperación:
-1. Simula una caída deteniendo el contenedor del maestro (`maestro`).
-2. Entra a la Réplica 1 (`la_nueva`), borra la metadata de esclavo y deshabilita su modo de *solo lectura* para promoverlo.
-3. Inserta exitosamente un nuevo registro confirmando que ahora ejerce como Maestro.
+Antes de probar las fallas, validaremos que la replicación fluye en paralelo y que las réplicas rechazan escrituras de manera efectiva.
 
-Para ejecutar la prueba de failover, simplemente corre:
-
+**A. Verificación de Tráfico en Paralelo y Consistencia:**
+Inserta un dato en el maestro desde la terminal:
 ```bash
-./scripts/test_failover.sh
+docker exec maestro mariadb -uroot -prootpassword -e "USE lab_test; INSERT INTO items (name) VALUES ('Prueba de Consistencia Directa');"
+```
+Verifica que el dato se haya propagado a ambas réplicas en paralelo:
+```bash
+docker exec la_nueva mariadb -uroot -prootpassword -e "USE lab_test; SELECT * FROM items;"
+docker exec la_ex mariadb -uroot -prootpassword -e "USE lab_test; SELECT * FROM items;"
+```
+
+**B. Verificación de Restricción de Solo Lectura (`read_only`):**
+Para probar que las réplicas rechazan escrituras, crearemos un usuario de aplicación estándar, ya que el usuario `root` en MariaDB (al tener permisos `SUPER`) ignora por diseño la restricción `read_only`.
+
+Crea el usuario en el Maestro:
+```bash
+docker exec maestro mariadb -uroot -prootpassword -e "CREATE USER 'app_user'@'%' IDENTIFIED BY '1234'; GRANT ALL PRIVILEGES ON lab_test.* TO 'app_user'@'%'; FLUSH PRIVILEGES;"
+```
+
+Intenta insertar un dato en la Réplica 1 usando este usuario normal:
+```bash
+docker exec la_nueva mariadb -uapp_user -p1234 -e "USE lab_test; INSERT INTO items (name) VALUES ('Esto fallara');"
+```
+Deberás obtener un error explícito `ERROR 1290 (HY000)` indicando que el servidor se encuentra con la opción `--read-only` activada, demostrando que cumplen su rol de solo lectura.
+
+---
+
+## 4. Prueba de Tolerancia a Fallos (Failover Manual)
+
+Para comprobar la resiliencia del clúster frente a caídas, realizaremos un procedimiento manual de desastre y recuperación.
+
+**Paso 1: Simular la caída del Maestro**
+Detén el contenedor principal:
+```bash
+docker stop maestro
+```
+
+**Paso 2: Promover la Réplica 1 a Nuevo Maestro**
+Desvincula la réplica, borra su metadata de esclavo y deshabilita el modo de *solo lectura* para que acepte escrituras:
+```bash
+docker exec la_nueva mariadb -uroot -prootpassword -e "STOP SLAVE; RESET SLAVE ALL; SET GLOBAL read_only = 0;"
+```
+
+**Paso 3: Validar el Failover (Insertar en el Nuevo Maestro)**
+Prueba a insertar un dato directamente en la Réplica 1 (`la_nueva`), la cual ahora actúa como maestro principal:
+```bash
+docker exec la_nueva mariadb -uroot -prootpassword -e "USE lab_test; INSERT INTO items (name) VALUES ('Dato post-failover manual');"
+```
+
+Verifica que el dato se haya insertado correctamente, lo que confirma que ahora asume el rol de Maestro:
+```bash
+docker exec la_nueva mariadb -uroot -prootpassword -e "USE lab_test; SELECT * FROM items;"
 ```
 
 ---
 
-## 4. Parada y Limpieza del Sistema
+## 5. Parada y Limpieza del Sistema
 
 Si deseas detener los contenedores y destruir por completo la información, los logs y las tablas, debes borrar los volúmenes de Docker ubicándote en la carpeta `lab_replica`:
 
