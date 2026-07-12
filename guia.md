@@ -24,18 +24,42 @@ Una vez que el script finaliza, la API estará escuchando peticiones en el puert
 **1. Para insertar un dato (Escritura -> viaja al Maestro):**
 - **Método:** `POST`
 - **URL:** `http://localhost:3000/api/items`
-- **Body:** Selecciona `raw` y cambia a `JSON`. Pega lo siguiente:
+- **Body:** Selecciona `raw` y `JSON`. Pega lo siguiente:
   ```json
   {
       "name": "Probando desde Postman"
   }
   ```
-- **Send:** Debería devolver `201 Created`.
+- **Send:** Debería devolver `201 Created` con una respuesta similar a:
+  ```json
+  {
+      "message": "Dato guardado correctamente (Command)",
+      "data": {
+          "servedBy": "maestro",
+          "name": "Probando desde Postman"
+      }
+  }
+  ```
+  *(Nota que el campo `servedBy` te indicará explícitamente que la escritura fue procesada por el nodo maestro).*
 
 **2. Para consultar los datos (Lectura -> se lee de la_nueva o la_ex):**
 - **Método:** `GET`
 - **URL:** `http://localhost:3000/api/items`
-- **Send:** Debería devolver `200 OK` con todos los registros actuales.
+- **Send:** Debería devolver `200 OK` con todos los registros. Si envías la petición varias veces seguidas, verás cómo el campo `servedBy` va alternando entre `la_nueva` y `la_ex`, demostrando visualmente el balanceo de carga:
+  ```json
+  {
+      "message": "Datos leídos (Query)",
+      "data": {
+          "servedBy": "la_nueva",
+          "items": [
+              {
+                  "id": 1,
+                  "name": "Probando desde Postman"
+              }
+          ]
+      }
+  }
+  ```
 
 ### Opción B: Pruebas rápidas por Terminal (cURL)
 

@@ -4,6 +4,7 @@ services:
   maestro:
     image: mariadb:10.11
     container_name: maestro
+    hostname: maestro
     environment:
       MARIADB_ROOT_PASSWORD: rootpassword
       MARIADB_DATABASE: lab_db
@@ -17,6 +18,7 @@ services:
   la_nueva:
     image: mariadb:10.11
     container_name: la_nueva
+    hostname: la_nueva
     environment:
       MARIADB_ROOT_PASSWORD: rootpassword
     ports:
@@ -31,6 +33,7 @@ services:
   la_ex:
     image: mariadb:10.11
     container_name: la_ex
+    hostname: la_ex
     environment:
       MARIADB_ROOT_PASSWORD: rootpassword
     ports:
