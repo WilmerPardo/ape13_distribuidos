@@ -75,9 +75,15 @@ curl -X POST http://localhost:3000/api/items \
      -d '{"name": "Dato de Prueba 1"}'
 ```
 
-**Para consultar los datos:**
+**Para consultar los datos en formato JSON crudo:**
 ```bash
 curl http://localhost:3000/api/items
+```
+
+**Para consultar los datos en formato de Tabla (más legible):**
+Si tienes instalada la utilidad `jq` (muy común en Linux), puedes usar este comando para transformar la respuesta JSON de la API en una tabla limpia que te muestra el ID, el Nombre, y qué nodo respondió a la consulta:
+```bash
+curl -s http://localhost:3000/api/items | jq -r '["SERVED BY", "ID", "NAME"], ["---------", "--", "-------------------"], (.data | .servedBy as $node | .items[] | [$node, .id, .name]) | @tsv' | column -t -s $'\t'
 ```
 
 ---
