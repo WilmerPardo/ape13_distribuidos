@@ -61,6 +61,11 @@ Una vez que el script finaliza, la API estará escuchando peticiones en el puert
   }
   ```
 
+- **Prueba rápida del Balanceo de Carga:** También puedes verificar este comportamiento (Round-Robin) ejecutando tres peticiones rápidas seguidas desde tu terminal:
+  ```bash
+  curl -s http://localhost:3000/api/items | grep servedBy && curl -s http://localhost:3000/api/items | grep servedBy && curl -s http://localhost:3000/api/items | grep servedBy
+  ```
+
 ### Opción B: Pruebas rápidas por Terminal (cURL)
 
 **Para insertar un dato:**
